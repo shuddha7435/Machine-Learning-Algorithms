@@ -1,83 +1,57 @@
-# Code practise - Implementation from (www.datacamp.com/community/tutorials/support-vector-machines-r)
+# Sample heart disease dataset classification problem implementation
 
-set.seed(10111)
-x = matrix(rnorm(40), 20, 2)
-y = rep(c(-1, 1), c(10, 10))
-x[y == 1,] = x[y == 1,] + 1
-plot(x, col = y + 3, pch = 19)
+install.packages('caret')
+library('caret')
 
+heart <- read.csv("Heart_Disease.csv", sep = ',', header = FALSE)
 
-library(e1071)
+str(heart)
 
+head(heart)
 
-dat = data.frame(x, y = as.factor(y))
-svmfit = svm(y ~ ., data = dat, kernel = "linear", cost = 10, scale = FALSE)
-print(svmfit)
-
-
-plot(svmfit, dat)
+set.seed(3033)
+intrain <- createDataPartition(y = heart$V9, p= 0.7, list = FALSE)
+training <- heart[intrain,]
+testing <- heart[-intrain,]
 
 
-
-make.grid = function(x, n = 75) {
-  grange = apply(x, 2, range)
-  x1 = seq(from = grange[1,1], to = grange[2,1], length = n)
-  x2 = seq(from = grange[1,2], to = grange[2,2], length = n)
-  expand.grid(X1 = x1, X2 = x2)
-}
+dim(training); 
+dim(testing);
 
 
-xgrid = make.grid(x)
-xgrid[1:10,]
+anyNA(heart)
+
+summary(heart)
 
 
-ygrid = predict(svmfit, xgrid)
-plot(xgrid, col = c("red","blue")[as.numeric(ygrid)], pch = 20, cex = .2)
-points(x, col = y + 3, pch = 19)
-points(x[svmfit$index,], pch = 5, cex = 2)
+training[["V14"]] = factor(training[["V14"]])
 
 
-
-beta = drop(t(svmfit$coefs)%*%x[svmfit$index,])
-beta0 = svmfit$rho
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
 
 
-plot(xgrid, col = c("red", "blue")[as.numeric(ygrid)], pch = 20, cex = .2)
-points(x, col = y + 3, pch = 19)
-points(x[svmfit$index,], pch = 5, cex = 2)
-abline(beta0 / beta[2], -beta[1] / beta[2])
-abline((beta0 - 1) / beta[2], -beta[1] / beta[2], lty = 2)
-abline((beta0 + 1) / beta[2], -beta[1] / beta[2], lty = 2)
+svm_Linear <- train(V14 ~., data = training, method = "svmLinear",
+                    trControl=trctrl,
+                    preProcess = c("center", "scale"),
+                    tuneLength = 10)
+
+svm_Linear
 
 
-load(file = "ESL.mixture.rda")
-names(ESL.mixture)
+test_pred <- predict(svm_Linear, newdata = testing)
+test_pred
 
-rm(x, y)
-attach(ESL.mixture)
-
-plot(x, col = y + 1)
-
-
-dat = data.frame(y = factor(y), x)
-fit = svm(factor(y) ~ ., data = dat, scale = FALSE, kernel = "radial", cost = 5)
-
-
-xgrid = expand.grid(X1 = px1, X2 = px2)
-ygrid = predict(fit, xgrid)
+grid <- expand.grid(C = c(0,0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2,5))
+svm_Linear_Grid <- train(V14 ~., data = training, method = "svmLinear",
+                         trControl=trctrl,
+                         preProcess = c("center", "scale"),
+                         tuneGrid = grid,
+                         tuneLength = 10)
+svm_Linear_Grid
+plot(svm_Linear_Grid)
 
 
-plot(xgrid, col = as.numeric(ygrid), pch = 20, cex = .2)
-points(x, col = y + 1, pch = 19)
+test_pred_grid <- predict(svm_Linear_Grid, newdata = testing)
+test_pred_grid
 
 
-func = predict(fit, xgrid, decision.values = TRUE)
-func = attributes(func)$decision
-
-xgrid = expand.grid(X1 = px1, X2 = px2)
-ygrid = predict(fit, xgrid)
-plot(xgrid, col = as.numeric(ygrid), pch = 20, cex = .2)
-points(x, col = y + 1, pch = 19)
-
-contour(px1, px2, matrix(func, 69, 99), level = 0, add = TRUE)
-contour(px1, px2, matrix(func, 69, 99), level = 0.5, add = TRUE, col = "blue", lwd = 2)
